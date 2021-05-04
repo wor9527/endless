@@ -79,6 +79,7 @@ type endlessServer struct {
 	isChild          bool
 	state            uint8
 	lock             *sync.RWMutex
+	handler          func()
 	BeforeBegin      func(add string)
 }
 
@@ -150,6 +151,17 @@ nil, in which case the DefaultServeMux is used.
 */
 func ListenAndServe(addr string, handler http.Handler) error {
 	server := NewServer(addr, handler)
+	return server.ListenAndServe()
+}
+
+/*
+ListenAndServe listens on the TCP network address addr and then calls Serve
+with handler to handle requests on incoming connections. Handler is typically
+nil, in which case the DefaultServeMux is used.
+*/
+func ListenAndServeWithHandler(addr string, handler http.Handler, cb func()) error {
+	server := NewServer(addr, handler)
+	server.handler = cb
 	return server.ListenAndServe()
 }
 
@@ -342,6 +354,9 @@ func (srv *endlessServer) handleSignals() {
 			srv.shutdown()
 		case syscall.SIGTERM:
 			log.Println(pid, "Received SIGTERM.")
+			if srv.handler != nil {
+				srv.handler()
+			}
 			srv.shutdown()
 		case syscall.SIGTSTP:
 			log.Println(pid, "Received SIGTSTP.")
